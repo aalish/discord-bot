@@ -1,0 +1,72 @@
+[
+  {
+    "id": "2c0119ef-060e-4ab3-9605-d061d7637cc1",
+    "created_at": "2024-12-21T08:20:38.300146Z",
+    "updated_at": "2024-12-21T08:20:38.300146Z",
+    "question": "Is USD preferred as reserved currency?",
+    "question_type": "multiple_choice",
+    "answer_choices": {
+      "additionalProp1": "Yes",
+      "additionalProp2": "No",
+      "additionalProp3": "Not sure"
+    },
+    "start_date": "2024-12-21T08:24:27.916000Z",
+    "end_date": "2025-01-04T08:24:27.916000Z"
+  },
+  {
+    "id": "d719ccc7-920d-4902-8aa9-64b4451c1643",
+    "created_at": "2024-12-21T08:20:38.300146Z",
+    "updated_at": "2024-12-21T08:20:38.300146Z",
+    "question": "Is the RSI oversold for BTC?",
+    "question_type": "multiple_choice",
+    "answer_choices": {
+      "additionalProp1": "Yes",
+      "additionalProp2": "No",
+      "additionalProp3": "Not sure"
+    },
+    "start_date": "2024-12-21T08:24:27.916000Z",
+    "end_date": "2025-01-04T08:24:27.916000Z"
+  },
+  {
+    "id": "32c4c07a-e3c1-49ed-b5de-af7d72828b04",
+    "created_at": "2024-12-21T08:20:38.300146Z",
+    "updated_at": "2024-12-21T08:20:38.300146Z",
+    "question": "Is the RSI overbought for BTC?",
+    "question_type": "multiple_choice",
+    "answer_choices": {
+      "additionalProp1": "Yes",
+      "additionalProp2": "No",
+      "additionalProp3": "Not sure"
+    },
+    "start_date": "2024-12-21T08:24:27.916000Z",
+    "end_date": "2025-01-04T08:24:27.916000Z"
+  },
+  {
+    "id": "a064ff11-12e1-4700-bedc-2df1f1837d5c",
+    "created_at": "2024-12-21T08:20:38.300146Z",
+    "updated_at": "2024-12-21T08:20:38.300146Z",
+    "question": "Is the SMA200 broken recently for BTC?",
+    "question_type": "multiple_choice",
+    "answer_choices": {
+      "additionalProp1": "Yes",
+      "additionalProp2": "No",
+      "additionalProp3": "Not sure"
+    },
+    "start_date": "2024-12-21T08:24:27.916000Z",
+    "end_date": "2025-01-04T08:24:27.916000Z"
+  },
+  {
+    "id": "32e75e28-54e3-4d06-9b33-f177cfc3fc47",
+    "created_at": "2024-12-21T08:20:38.300146Z",
+    "updated_at": "2024-12-21T08:20:38.300146Z",
+    "question": "Is golden cross happening soon for BTC?",
+    "question_type": "multiple_choice",
+    "answer_choices": {
+      "additionalProp1": "Yes",
+      "additionalProp2": "No",
+      "additionalProp3": "Not sure"
+    },
+    "start_date": "2024-12-21T08:24:27.916000Z",
+    "end_date": "2025-01-04T08:24:27.916000Z"
+  }
+]
