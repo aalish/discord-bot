@@ -1,154 +1,129 @@
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
+from discord import app_commands
 import requests
-import asyncio
 from dotenv import load_dotenv
 import os
 import logging
 import time
-
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Load environment variables
 load_dotenv()
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID"))  # Replace with the Discord channel ID where notifications should be sent
+CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID"))
 TIME_INTERVAL = int(os.getenv("TIME_INTERVAL"))
+
 intents = discord.Intents.default()
 intents.messages = True
-intents.message_content = True  # Enable message content intent
-bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents)
+intents.message_content = True
 
 API_URL = "https://backend.numenex.com/questions/"
 HEALTH_CHECK_URL = "https://backend.numenex.com/health-check"
 
-# Helper function to send a message to the Discord channel
-async def notify_discord(message):
-    logging.debug(f"Attempting to send message to channel {CHANNEL_ID}: {message}")
-    channel = bot.get_channel(CHANNEL_ID)
-    if channel:
-        await channel.send(message)
-    else:
-        logging.error(f"Channel with ID {CHANNEL_ID} not found.")
+class MonitoringBot(discord.Client):
+    def __init__(self):
+        super().__init__(intents=intents)
+        self.tree = app_commands.CommandTree(self)
 
-# Function to check questions API
-async def check_questions():
-    logging.info("Checking questions API...")
-    start_time = time.time()
+    async def setup_hook(self):
+        await self.tree.sync()
+
+# Initialize the bot
+bot = MonitoringBot()
+
+# Helper function for auto-completion
+async def question_type_autocomplete(interaction: discord.Interaction, current: str):
+    question_types = ["type1", "type2", "type3"]  # Replace with actual types or fetch dynamically
+    return [
+        app_commands.Choice(name=qt, value=qt)
+        for qt in question_types if current.lower() in qt.lower()
+    ]
+
+# Function to fetch questions from API
+async def fetch_questions():
     try:
         response = requests.get(API_URL, headers={"accept": "application/json"})
-        response_time = time.time() - start_time
-        logging.debug(f"Questions API Response: {response.status_code} - {response.text}")
         if response.status_code == 200:
-            questions = response.json()
-            if not questions:
-                logging.warning("No questions found in the API response.")
-                return f"⚠️ No questions found in the API response!\n**Server Host URL:** {API_URL}\n**Time Taken:** {response_time:.2f} seconds", None
-            else:
-                # Create a formatted response with lines between entries
-                formatted_questions = "\n\n".join([
-                    f"{'-' * 40}\n**ID:** {q['id']}\n**Question:** {q['question']}\n**Type:** {q['question_type']}\n{'-' * 40}"
-                    for q in questions
-                ])
-                return (f"**Server Host URL:** {API_URL}\n**Time Taken:** {response_time:.2f} seconds\n\n"
-                        f"✅ Questions fetched successfully:\n\n{formatted_questions}"
-                        ), questions
+            return response.json()
         else:
-            logging.error(f"Error fetching questions: {response.status_code} - {response.text}")
-            return f"❌ Error fetching questions: {response.status_code} - {response.text}\n**Server Host URL:** {API_URL}\n**Time Taken:** {response_time:.2f} seconds", None
+            logging.error(f"Error fetching questions: {response.status_code}")
+            return []
     except Exception as e:
-        logging.exception("Exception occurred while checking questions API.")
-        response_time = time.time() - start_time
-        return f"❌ Exception occurred while checking questions: {e}\n**Server Host URL:** {API_URL}\n**Time Taken:** {response_time:.2f} seconds", None
-
-# Function to check server health
-async def check_server_health():
-    logging.info("Checking server health...")
+        logging.exception("Exception while fetching questions")
+        return []
+@bot.tree.command(name="check_questions", description="Fetch and display questions from the server.")
+async def check_questions(interaction: discord.Interaction):
+    logging.info("Received slash command: check_questions")
     start_time = time.time()
+    await interaction.response.defer()
+    questions = await fetch_questions()
+    response_time = time.time() - start_time
+    if not questions:
+        
+        await interaction.followup.send(f"{'-' * 40}\n⚠️ No questions found in the server response.\n**Server Host URL:** {API_URL}\n**Time Taken:** {response_time:.2f} seconds\n{'-' * 40}")
+        return
+
+    formatted_questions = "\n\n".join(
+        [
+            f"{'-' * 40}\n**ID:** {q['id']}\n**Question:** {q['question']}\n**Type:** {q['question_type']}"
+            for q in questions
+        ]
+    )
+    await interaction.followup.send(f"**Server Host URL:** {API_URL}\n**Time Taken:** {response_time:.2f} seconds\n\n{'-' * 40}\nFetched Questions:\n\n{formatted_questions}\n{'-' * 40}\n")
+
+# Slash command for server health check
+@bot.tree.command(name="check_server", description="Check server health status.")
+async def check_server(interaction: discord.Interaction):
+    logging.info("Received slash command: check_server")
+    await interaction.response.defer()
     try:
-        response = requests.get(HEALTH_CHECK_URL, timeout=60)
-        response_time = time.time() - start_time
-        logging.debug(f"Server Health Response: {response.status_code} - {response.text}")
+        response = requests.get(HEALTH_CHECK_URL, timeout=10)
         if response.status_code == 200:
-            return None  # Healthy server, no notification
+            await interaction.followup.send(f"{'-' * 40}\n✅ Server is healthy.\n{'-' * 40}")
         else:
-            return f"{'-' * 40}\n❌ Server health issue!\n{'-' * 40}\n**Server Host URL:** {HEALTH_CHECK_URL}\n**Time Taken:** {response_time:.2f} seconds\n**Status Code:** {response.status_code}\n{'-' * 40}"
+            await interaction.followup.send(f"{'-' * 40}\n❌ Server health issue! Status Code: {response.status_code}\n{'-' * 40}")
     except requests.exceptions.Timeout:
-        return f"{'-' * 40}\n❌ Server health check timed out after 60 seconds!\n{'-' * 40}\n**Server Host URL:** {HEALTH_CHECK_URL}\n{'-' * 40}"
+        await interaction.followup.send(f"{'-' * 40}\n❌ Server health check timed out!\n{'-' * 40}\n")
     except Exception as e:
-        return f"{'-' * 40}\n❌ Exception during health check: {e}\n{'-' * 40}\n**Server Host URL:** {HEALTH_CHECK_URL}\n{'-' * 40}"
+        logging.exception("Error during server health check")
+        await interaction.followup.send(f"{'-' * 40}\n❌ Error checking server health: {e}\n{'-' * 40}")
 
-# Background task to continuously monitor server health and questions API
+# Background task to continuously monitor server health
 @tasks.loop(minutes=TIME_INTERVAL)
-
-
 async def continuous_monitoring():
     logging.info("Performing continuous monitoring...")
+    
     channel = bot.get_channel(CHANNEL_ID)
     if not channel:
         logging.error(f"Channel with ID {CHANNEL_ID} not found. Skipping monitoring.")
         return
 
     # Check server health
-    server_status = await check_server_health()
-    if server_status:
-        await channel.send(server_status)
+    try:
+        start_time = time.time()
+        response = requests.get(HEALTH_CHECK_URL, timeout=10)
+        response_time = time.time() - start_time
+        if response.status_code != 200:
+            await channel.send(f"{'-' * 40}\n❌ Server health issue!\n**Server Host URL:** {HEALTH_CHECK_URL}\n**Time Taken:** {response_time:.2f} seconds\n**Status Code:** {response.status_code}\n{'-' * 40}\n")
+    except requests.exceptions.Timeout:
+        await channel.send(f"{'-' * 40}\n❌ Server health check timed out!\n**Server Host URL:** {HEALTH_CHECK_URL}\n{'-' * 40}")
+    except Exception as e:
+        await channel.send(f"{'-' * 40}\n❌ Error checking server health: {e}\n**Server Host URL:** {HEALTH_CHECK_URL}\n{'-' * 40}")
 
     # Check questions API
-    questions_status, _ = await check_questions()
-    if questions_status.startswith("❌") or questions_status.startswith("⚠️"):
-        await channel.send(questions_status)
+    questions = await fetch_questions()
+    if not questions:
+        await channel.send(f"{'-' * 40}\n⚠️ No questions found in the API response!\n**Server Host URL:** {HEALTH_CHECK_URL}\n{'-' * 40}")
 
-
-# Command to manually check questions API
-@bot.command(name="check_questions")
-async def manual_check_questions(ctx):
-    logging.info("Received command: check_questions")
-    logging.debug(f"Command invoked by user: {ctx.author} in channel: {ctx.channel}")
-    try:
-        status, _ = await check_questions()
-        await ctx.send(f"{status}")
-    except Exception as e:
-        logging.exception("Error while executing check_questions command.")
-        await ctx.send(f"❌ Error executing command: {e}")
-
-# Command to manually check server health
-@bot.command(name="check_server")
-async def manual_check_server(ctx):
-    logging.info("Received command: check_server")
-    logging.debug(f"Command invoked by user: {ctx.author} in channel: {ctx.channel}")
-    try:
-        status, _ = await check_server_health()
-        await ctx.send(f"{status}")
-    except Exception as e:
-        logging.exception("Error while executing check_server command.")
-        await ctx.send(f"❌ Error executing command: {e}")
-
-# Remove the existing help command and redefine it
-bot.remove_command("help")
-
-@bot.command(name="help")
-async def custom_help(ctx):
-    help_text = (
-        "**Bot Commands:**\n"
-        "1. `@Numenex  check_questions` - Fetch and display questions from the server.\n"
-        "2. `@Numenex check_server` - Check server health status.\n"
-        "3. `@Numenex help` - Show this help message."
-    )
-    await ctx.send(help_text)
-
-# Bot events
 @bot.event
 async def on_ready():
     logging.info(f"Bot logged in as {bot.user}")
-    await notify_discord("✅ Bot is online and monitoring!")
+    channel = bot.get_channel(CHANNEL_ID)
+    if channel:
+        await channel.send(f"{'-' * 40}\n✅ Bot is online and monitoring!\n{'-' * 40}")
     continuous_monitoring.start()
-
-@bot.event
-async def on_message(message):
-    logging.debug(f"Message received: {message.content} from {message.author}")
-    await bot.process_commands(message)
 
 # Run the bot
 logging.info("Starting the bot...")
