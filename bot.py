@@ -55,7 +55,7 @@ async def fetch_questions():
         return []
 @bot.tree.command(name="check_questions", description="Fetch and display questions from the server.")
 async def check_questions(interaction: discord.Interaction):
-    logging.info("Received slash command: check_questions")
+    # logging.info("Received slash command: check_questions")
     start_time = time.time()
     await interaction.response.defer()
     questions = await fetch_questions()
@@ -76,7 +76,7 @@ async def check_questions(interaction: discord.Interaction):
 # Slash command for server health check
 @bot.tree.command(name="check_server", description="Check server health status.")
 async def check_server(interaction: discord.Interaction):
-    logging.info("Received slash command: check_server")
+    # logging.info("Received slash command: check_server")
     await interaction.response.defer()
     try:
         response = requests.get(HEALTH_CHECK_URL, timeout=10)
@@ -93,11 +93,11 @@ async def check_server(interaction: discord.Interaction):
 # Background task to continuously monitor server health
 @tasks.loop(minutes=TIME_INTERVAL)
 async def continuous_monitoring():
-    logging.info("Performing continuous monitoring...")
+    # logging.info("Performing continuous monitoring...")
     
     channel = bot.get_channel(CHANNEL_ID)
     if not channel:
-        logging.error(f"Channel with ID {CHANNEL_ID} not found. Skipping monitoring.")
+        # logging.error(f"Channel with ID {CHANNEL_ID} not found. Skipping monitoring.")
         return
 
     # Check server health
