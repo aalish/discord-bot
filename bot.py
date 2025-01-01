@@ -14,11 +14,11 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 load_dotenv()
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID"))  # Replace with the Discord channel ID where notifications should be sent
-
+TIME_INTERVAL = int(os.getenv("TIME_INTERVAL"))
 intents = discord.Intents.default()
 intents.messages = True
 intents.message_content = True  # Enable message content intent
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents)
 
 API_URL = "https://backend.numenex.com/questions/"
 HEALTH_CHECK_URL = "https://backend.numenex.com/health-check"
@@ -46,15 +46,14 @@ async def check_questions():
                 logging.warning("No questions found in the API response.")
                 return f"⚠️ No questions found in the API response!\n**Server Host URL:** {API_URL}\n**Time Taken:** {response_time:.2f} seconds", None
             else:
-                # Create a table-like format for questions
-                table_header = "| ID | Question | Type |\n| --- | --- | --- |"
-                table_rows = "\n".join([
-                    f"| {q['id']} | {q['question']} | {q['question_type']} |"
+                # Create a formatted response with lines between entries
+                formatted_questions = "\n\n".join([
+                    f"{'-' * 40}\n**ID:** {q['id']}\n**Question:** {q['question']}\n**Type:** {q['question_type']}\n{'-' * 40}"
                     for q in questions
                 ])
-                table_content = f"{table_header}\n{table_rows}"
-                return (f"✅ Questions fetched successfully:\n\n{table_content}\n\n"
-                        f"**Server Host URL:** {API_URL}\n**Time Taken:** {response_time:.2f} seconds"), questions
+                return (f"**Server Host URL:** {API_URL}\n**Time Taken:** {response_time:.2f} seconds\n\n"
+                        f"✅ Questions fetched successfully:\n\n{formatted_questions}"
+                        ), questions
         else:
             logging.error(f"Error fetching questions: {response.status_code} - {response.text}")
             return f"❌ Error fetching questions: {response.status_code} - {response.text}\n**Server Host URL:** {API_URL}\n**Time Taken:** {response_time:.2f} seconds", None
@@ -66,17 +65,41 @@ async def check_questions():
 # Function to check server health
 async def check_server_health():
     logging.info("Checking server health...")
+    start_time = time.time()
     try:
-        response = requests.get(HEALTH_CHECK_URL)
+        response = requests.get(HEALTH_CHECK_URL, timeout=60)
+        response_time = time.time() - start_time
         logging.debug(f"Server Health Response: {response.status_code} - {response.text}")
         if response.status_code == 200:
-            return "✅ Server is healthy.", response.text
+            return None  # Healthy server, no notification
         else:
-            logging.error("Server health check failed: Server is down!")
-            return "❌ Server health check failed: Server is down!", None
+            return f"{'-' * 40}\n❌ Server health issue!\n{'-' * 40}\n**Server Host URL:** {HEALTH_CHECK_URL}\n**Time Taken:** {response_time:.2f} seconds\n**Status Code:** {response.status_code}\n{'-' * 40}"
+    except requests.exceptions.Timeout:
+        return f"{'-' * 40}\n❌ Server health check timed out after 60 seconds!\n{'-' * 40}\n**Server Host URL:** {HEALTH_CHECK_URL}\n{'-' * 40}"
     except Exception as e:
-        logging.exception("Exception occurred during server health check.")
-        return f"❌ Exception occurred during server health check: {e}", None
+        return f"{'-' * 40}\n❌ Exception during health check: {e}\n{'-' * 40}\n**Server Host URL:** {HEALTH_CHECK_URL}\n{'-' * 40}"
+
+# Background task to continuously monitor server health and questions API
+@tasks.loop(minutes=TIME_INTERVAL)
+
+
+async def continuous_monitoring():
+    logging.info("Performing continuous monitoring...")
+    channel = bot.get_channel(CHANNEL_ID)
+    if not channel:
+        logging.error(f"Channel with ID {CHANNEL_ID} not found. Skipping monitoring.")
+        return
+
+    # Check server health
+    server_status = await check_server_health()
+    if server_status:
+        await channel.send(server_status)
+
+    # Check questions API
+    questions_status, _ = await check_questions()
+    if questions_status.startswith("❌") or questions_status.startswith("⚠️"):
+        await channel.send(questions_status)
+
 
 # Command to manually check questions API
 @bot.command(name="check_questions")
@@ -85,7 +108,7 @@ async def manual_check_questions(ctx):
     logging.debug(f"Command invoked by user: {ctx.author} in channel: {ctx.channel}")
     try:
         status, _ = await check_questions()
-        await ctx.send(status)
+        await ctx.send(f"{status}")
     except Exception as e:
         logging.exception("Error while executing check_questions command.")
         await ctx.send(f"❌ Error executing command: {e}")
@@ -97,16 +120,30 @@ async def manual_check_server(ctx):
     logging.debug(f"Command invoked by user: {ctx.author} in channel: {ctx.channel}")
     try:
         status, _ = await check_server_health()
-        await ctx.send(status)
+        await ctx.send(f"{status}")
     except Exception as e:
         logging.exception("Error while executing check_server command.")
         await ctx.send(f"❌ Error executing command: {e}")
+
+# Remove the existing help command and redefine it
+bot.remove_command("help")
+
+@bot.command(name="help")
+async def custom_help(ctx):
+    help_text = (
+        "**Bot Commands:**\n"
+        "1. `@Numenex  check_questions` - Fetch and display questions from the server.\n"
+        "2. `@Numenex check_server` - Check server health status.\n"
+        "3. `@Numenex help` - Show this help message."
+    )
+    await ctx.send(help_text)
 
 # Bot events
 @bot.event
 async def on_ready():
     logging.info(f"Bot logged in as {bot.user}")
     await notify_discord("✅ Bot is online and monitoring!")
+    continuous_monitoring.start()
 
 @bot.event
 async def on_message(message):
