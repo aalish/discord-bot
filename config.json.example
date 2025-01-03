@@ -1,0 +1,14 @@
+[
+    {
+      "Name":"Name Of the Application",
+      "URL": "Base URL of Server",
+      "Required Status Code": 200,
+      "Healthcheck Route": "/"
+    },
+    {
+      "Name":"Name Of the Application",
+      "URL": "Base URL ofla Server",
+      "Required Status Code": 200,
+      "Healthcheck Route": "/health-check"
+    }
+  ]
