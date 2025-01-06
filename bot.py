@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID"))
 TIME_INTERVAL = int(os.getenv("TIME_INTERVAL"))
-
+WAIT_TIME = 15 * 60
 # Load server configurations
 with open("./config.json", "r") as file:
     SERVERS = json.load(file)
@@ -129,13 +129,15 @@ async def continuous_monitoring():
             if response.status_code != 200:
                 await channel.send(
                     f"{'-' * 40}\n❌ Server health issue!\n**Server Host URL:** {healthcheck_endpoint}\n"
-                    f"**Time Taken:** {response_time:.2f} seconds\n**Status Code:** {response.status_code}\n{'-' * 40}\n"
+                    f"**Time Taken:** {response_time:.2f} seconds\n**Status Code:** {response.status_code}\nSleeping for {WAIT_TIME} minutes\n{'-' * 40}\n"
                 )
+                time.sleep(WAIT_TIME)
         except requests.exceptions.Timeout:
-            await channel.send(f"{'-' * 40}\n❌ Server health check timed out!\n**Server Host URL:** {healthcheck_endpoint}\n{'-' * 40}")
+            await channel.send(f"{'-' * 40}\n❌ Server health check timed out!\n**Server Host URL:** {healthcheck_endpoint}\nSleeping for {WAIT_TIME} minutes\n{'-' * 40}")
+            time.sleep(WAIT_TIME)
         except Exception as e:
-            await channel.send(f"{'-' * 40}\n❌ Error checking server health: {e}\n**Server Host URL:** {healthcheck_endpoint}\n{'-' * 40}")
-
+            await channel.send(f"{'-' * 40}\n❌ Error checking server health: {e}\n**Server Host URL:** {healthcheck_endpoint}\nSleeping for {WAIT_TIME} minutes\n{'-' * 40}")
+            time.sleep(WAIT_TIME)
 
 @bot.event
 async def on_ready():
