@@ -148,10 +148,30 @@ def append_update_local(username, update_text):
             df = pd.DataFrame([row])
         with pd.ExcelWriter('local_updates.xlsx', engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
             df.to_excel(writer, sheet_name=username, index=False)
+        # Set column widths
+        from openpyxl import load_workbook
+        from openpyxl.utils import get_column_letter
+        wb = load_workbook('local_updates.xlsx')
+        ws = wb[username]
+        for i, col in enumerate(ws.columns, 1):
+            max_length =40 
+            col_letter = get_column_letter(i)
+            ws.column_dimensions[col_letter].width = max_length
+        wb.save('local_updates.xlsx')
     else:
         df = pd.DataFrame([row])
         with pd.ExcelWriter('local_updates.xlsx', engine='openpyxl') as writer:
             df.to_excel(writer, sheet_name=username, index=False)
+        # Set column widths
+        from openpyxl import load_workbook
+        from openpyxl.utils import get_column_letter
+        wb = load_workbook('local_updates.xlsx')
+        ws = wb[username]
+        for i, col in enumerate(ws.columns, 1):
+            max_length = 40
+            col_letter = get_column_letter(i)
+            ws.column_dimensions[col_letter].width = max_length
+        wb.save('local_updates.xlsx')
 
 class UpdateModal(ui.Modal, title="Submit an Update"):
     update_message = ui.TextInput(
