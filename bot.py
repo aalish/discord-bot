@@ -211,12 +211,15 @@ async def continuous_monitoring():
             response_time = time.time() - start_time
 
             if response.status_code != 200:
+                print(f"response.status_code: {response.status_code}")
                 await channel.send(
                     f"{'-' * 40}\n❌ Server health issue!\n**Server Host URL:** {healthcheck_endpoint}\n"
                     f"**Time Taken:** {response_time:.2f} seconds\n**Status Code:** {response.status_code}\nSleeping for {SLEEP_MINUTES} minutes\n{'-' * 40}\n"
                 )
                 await asyncio.sleep(WAIT_TIME)
         except requests.exceptions.Timeout:
+            print(f"healthcheck_endpoint: {healthcheck_endpoint}")
+            print(f"requests.exceptions.Timeout: {requests.exceptions.Timeout}")
             await channel.send(f"{'-' * 40}\n❌ Server health check timed out!\n**Server Host URL:** {healthcheck_endpoint}\nSleeping for {SLEEP_MINUTES} minutes\n{'-' * 40}")
             await asyncio.sleep(WAIT_TIME)
         except Exception as e:
