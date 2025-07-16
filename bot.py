@@ -34,6 +34,8 @@ with open("./config.json", "r") as file:
 GUILD_ID = os.getenv("DISCORD_GUILD_ID")
 UPDATE_CHANNEL_ID = int(os.getenv("DISCORD_UPDATE_CHANNEL_ID"))
 MONITOR_CHANNEL_ID = int(os.getenv("DISCORD_MONITOR_CHANNEL_ID"))
+# Monitoring flag
+DISABLE_MONITORING = os.getenv("DISABLE_MONITORING", "false").lower() == "true"
 
 # Define intents
 intents = discord.Intents.default()
@@ -263,7 +265,13 @@ async def on_ready():
     monitor_channel = bot.get_channel(MONITOR_CHANNEL_ID)
     if monitor_channel:
         await monitor_channel.send(f"{'-' * 40}\n✅ Bot is online and monitoring!\n{'-' * 40}")
-    continuous_monitoring.start()
+    if not DISABLE_MONITORING:
+        continuous_monitoring.start()
+        logging.info("Application monitoring started.")
+    else:
+        logging.info("Application monitoring is DISABLED by flag.")
+        if monitor_channel:
+            await monitor_channel.send(f"{'-' * 40}\n⚠️ Application monitoring is DISABLED by flag.\n{'-' * 40}")
     if not scheduler.running:
         scheduler.start()
 
