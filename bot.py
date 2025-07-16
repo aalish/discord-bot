@@ -35,7 +35,7 @@ GUILD_ID = os.getenv("DISCORD_GUILD_ID")
 UPDATE_CHANNEL_ID = int(os.getenv("DISCORD_UPDATE_CHANNEL_ID"))
 MONITOR_CHANNEL_ID = int(os.getenv("DISCORD_MONITOR_CHANNEL_ID"))
 # Monitoring flag
-DISABLE_MONITORING = os.getenv("DISABLE_MONITORING", "false").lower() == "true"
+DISABLE_MONITORING = os.getenv("DISABLE_MONITORING", "true").lower() == "true"
 
 # Define intents
 intents = discord.Intents.default()
