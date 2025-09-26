@@ -28,6 +28,9 @@ CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID"))
 TIME_INTERVAL = int(os.getenv("TIME_INTERVAL"))
 SLEEP_MINUTES = 15
 WAIT_TIME = SLEEP_MINUTES * 60
+# Notify.me configuration
+NOTIFY_ME_ACCESS_CODE = os.getenv("NOTIFY_ME_ACCESS_CODE")
+TARGET_USERNAME = os.getenv("TARGET_USERNAME")
 # Load server configurations
 with open("./config.json", "r") as file:
     SERVERS = json.load(file)
@@ -61,6 +64,49 @@ ApplicationName = Enum(
 
 # Initialize the bot
 bot = MonitoringBot()
+
+# Function to send notification via notify.me
+async def send_alexa_notification(message_content, author_name, channel_name, mention_type, message_obj=None):
+    try:
+        notify_url = "https://api.notifymyecho.com/v1/NotifyMe"
+
+        # Clean and format the message content
+        clean_message = message_content.strip()
+
+        # Replace Discord mentions with readable names
+        if message_obj:
+            for user in message_obj.mentions:
+                user_mention = f"<@{user.id}>"
+                display_name = user.display_name or user.global_name or user.name
+                clean_message = clean_message.replace(user_mention, f"@{display_name}")
+
+        if len(clean_message) > 150:
+            clean_message = clean_message[:150] + "..."
+
+        # Create a clear, structured notification
+        if mention_type == "@everyone":
+            title = "Discord Everyone Mention"
+            notification = f"{author_name} mentioned everyone in {channel_name}. Message: {clean_message}"
+        elif mention_type == "test":
+            title = "Discord Bot Test"
+            notification = f"Test notification from {author_name} in {channel_name}. Message: {clean_message}"
+        else:
+            title = "Discord Personal Mention"
+            notification = f"{author_name} mentioned you in {channel_name}. Message: {clean_message}"
+
+        notification_data = {
+            "notification": notification,
+            "accessCode": NOTIFY_ME_ACCESS_CODE,
+            "title": title
+        }
+
+        response = requests.post(notify_url, json=notification_data, timeout=10)
+        if response.status_code == 200:
+            logging.info(f"Alexa notification sent successfully - {mention_type} mention from {author_name} in #{channel_name}")
+        else:
+            logging.error(f"Failed to send Alexa notification. Status: {response.status_code}, Response: {response.text}")
+    except Exception as e:
+        logging.error(f"Error sending Alexa notification: {e}")
 
 
 # Slash command to check a specific application's health
@@ -265,6 +311,54 @@ async def backup_now(interaction: discord.Interaction):
             await interaction.followup.send(f"❌ Backup failed: {e}", ephemeral=True)
     import asyncio
     asyncio.create_task(run_backup())
+
+@bot.tree.command(name="test_notification", description="Test the Alexa notification system.")
+async def test_notification(interaction: discord.Interaction):
+    await interaction.response.send_message("🧪 Testing Alexa notification...", ephemeral=True)
+    try:
+        await send_alexa_notification(
+            "This is a test notification from Discord bot to verify the system is working correctly.",
+            interaction.user.display_name,
+            interaction.channel.name if hasattr(interaction.channel, 'name') else "DM",
+            "test"
+        )
+        await interaction.followup.send("✅ Test notification sent to Alexa!", ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"❌ Test notification failed: {e}", ephemeral=True)
+
+@bot.event
+async def on_message(message):
+    # Don't respond to bot's own messages
+    if message.author == bot.user:
+        return
+
+    # Check if the message mentions everyone or the specific user
+    has_everyone_mention = message.mention_everyone
+
+    # Debug logging for mentions
+    if message.mentions:
+        for user in message.mentions:
+            logging.info(f"Found mention - Username: {user.name}, Display: {user.display_name}, Global: {user.global_name}, Target: {TARGET_USERNAME}")
+
+    has_user_mention = any(
+        user.name.lower() == TARGET_USERNAME.lower() or
+        user.display_name.lower() == TARGET_USERNAME.lower() or
+        user.global_name and user.global_name.lower() == TARGET_USERNAME.lower()
+        for user in message.mentions
+    )
+
+    if has_everyone_mention or has_user_mention:
+        mention_type = "@everyone" if has_everyone_mention else f"@{TARGET_USERNAME}"
+        logging.info(f"Mention detected: {mention_type} in #{message.channel.name} by {message.author.display_name}")
+
+        # Send notification to Alexa
+        await send_alexa_notification(
+            message.content,
+            message.author.display_name,
+            message.channel.name,
+            mention_type,
+            message
+        )
 
 @bot.event
 async def on_ready():
